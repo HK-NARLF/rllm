@@ -2,6 +2,7 @@ from rllm.tools.code_tools import (
     PythonInterpreter,
 )
 from rllm.tools.registry import ToolRegistry
+from rllm.tools.request_manager import ToolRequestManager, BaseScheduler, FIFOScheduler
 from rllm.tools.web_tools import (
     FirecrawlTool,
     GoogleSearchTool,
@@ -31,4 +32,7 @@ __all__ = [
     "TavilySearchTool",
     "ToolRegistry",
     "tool_registry",
+    "ToolRequestManager",
+    "BaseScheduler",
+    "FIFOScheduler",
 ]

@@ -2,11 +2,13 @@ import json
 import queue
 import warnings
 from typing import Any
+import asyncio
 
 from rllm.environments.base.base_env import BaseEnv
 from rllm.rewards.reward_fn import RewardFunction, zero_reward
 from rllm.tools.multi_tool import MultiTool
 from rllm.tools.tool_base import Tool
+from rllm.tools.request_manager import ToolRequestManager
 
 
 class ToolEnvironment(BaseEnv):
@@ -109,36 +111,36 @@ class ToolEnvironment(BaseEnv):
         return next_obs, reward, done, {"response": action, "metadata": {}}
 
     def _execute_tool_calls(self, tool_calls: list[dict[Any, Any]]) -> dict[str, str]:
-        import threading
-
-        # Create a dictionary to store results in order
-        tool_outputs: dict[str, str] = {}
-        output_queue: queue.Queue[tuple[str, str]] = queue.Queue()
-        threads = []
-
-        def execute_tool(tool_call):
+        """
+        Submits tool calls to ToolRequestManager and waits for their results.
+        This method is synchronous.
+        """
+        manager = ToolRequestManager()
+        if not manager._is_running:
+            manager.start()
+            
+        futures = {}
+        for tool_call in tool_calls:
             tool_name = tool_call["function"]["name"]
             tool_args = json.loads(tool_call["function"]["arguments"])
-            tool_output = self.tools(tool_name=tool_name, **tool_args)
-            tool_output_str = tool_output.to_string()
+            original_call_id = tool_call["id"]
 
-            output_queue.put((tool_call["id"], tool_output_str))
+            future = manager.submit_request(
+                tool_name=tool_name,
+                tool_args=tool_args,
+                original_call_id=original_call_id,
+            )
+            futures[original_call_id] = future
 
-        # Create and start a thread for each tool call
-        for idx, tool_call in enumerate(tool_calls):
-            thread = threading.Thread(target=execute_tool, args=(tool_call,))
-            threads.append(thread)
-            thread.start()
-
-        # Wait for all threads to complete
-        for thread in threads:
-            thread.join()
-
-        # Collect results and store in order
-        while not output_queue.empty():
-            tool_call_id, output_str = output_queue.get()
-            tool_outputs[tool_call_id] = output_str
-
+        tool_outputs: dict[str, str] = {}
+        for call_id, future in futures.items():
+            try:
+                result = future.result(timeout=60) 
+                tool_outputs[call_id] = str(result)
+            except Exception as e:
+                error_message = f"Error executing tool '{tool_call['function']['name']}': {type(e).__name__} - {str(e)}"
+                tool_outputs[call_id] = error_message
+        
         return tool_outputs
 
     @staticmethod
