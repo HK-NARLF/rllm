@@ -59,13 +59,17 @@ class ToolRequestManager:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self):
+    def __init__(self, qps_limit: int = 10):
         if self._initialized:
             return
         self.queue: asyncio.PriorityQueue[ToolRequest] = asyncio.PriorityQueue()
         self.results: dict[str, Any] = {}
         self.workers: list[asyncio.Task] = []
         self.scheduler: BaseScheduler = FIFOScheduler()
+        self.qps_limit = qps_limit
+        self.min_interval = 1.0 / qps_limit if qps_limit > 0 else 0
+        self.last_request_time = 0
+        self._worker_lock = asyncio.Lock()
         self._is_running = False
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: Thread | None = None
@@ -91,6 +95,17 @@ class ToolRequestManager:
                     self.queue.task_done()
                     continue
 
+                if self.qps_limit > 0:
+                    async with self._worker_lock:
+                        current_time = time.time()
+                        time_since_last = current_time - self.last_request_time
+                        
+                        if time_since_last < self.min_interval:
+                            sleep_time = self.min_interval - time_since_last
+                            await asyncio.sleep(sleep_time)
+                        
+                        self.last_request_time = time.time()
+
                 try:
                     # Get the tool registry instance
                     tool_registry = ToolRegistry()
@@ -115,13 +130,16 @@ class ToolRequestManager:
             except asyncio.CancelledError:
                 break
     
-    def start(self, num_workers: int = 4, scheduler: BaseScheduler | None = None):
+    def start(self, num_workers: int = 4, scheduler: BaseScheduler | None = None, qps_limit: int | None = None):
         with self._lock:
             if self._is_running:
                 return
                 
             if scheduler:
                 self.scheduler = scheduler
+            elif qps_limit is not None:
+                self.qps_limit = qps_limit
+                self.min_interval = 1.0 / qps_limit if qps_limit > 0 else 0
 
             self._is_running = True
             self._thread = Thread(target=self._start_event_loop, daemon=True)
@@ -134,7 +152,8 @@ class ToolRequestManager:
             for _ in range(num_workers):
                 self.workers.append(asyncio.run_coroutine_threadsafe(self._worker(), self._loop))
             
-            print(f"ToolRequestManager started with {num_workers} workers and {self.scheduler.__class__.__name__}.")
+            qps_info = f" with QPS limit {self.qps_limit}" if self.qps_limit > 0 else ""
+            print(f"ToolRequestManager started with {num_workers} workers and {self.scheduler.__class__.__name__}{qps_info}.")
 
     def stop(self):
         with self._lock:
