@@ -2,7 +2,15 @@ from rllm.tools.code_tools import (
     PythonInterpreter,
 )
 from rllm.tools.registry import ToolRegistry
-from rllm.tools.request_manager import ToolRequestManager, BaseScheduler, FIFOScheduler
+from rllm.tools.request_manager import (
+    ToolRequestManager, 
+    BaseScheduler, 
+    FIFOScheduler,
+    ToolManagerRegistry,
+    tool_manager_registry,
+    get_tool_manager,
+    submit_tool_request
+)
 from rllm.tools.web_tools import (
     FirecrawlTool,
     GoogleSearchTool,
@@ -35,4 +43,8 @@ __all__ = [
     "ToolRequestManager",
     "BaseScheduler",
     "FIFOScheduler",
+    "ToolManagerRegistry",
+    "tool_manager_registry",
+    "get_tool_manager",
+    "submit_tool_request",
 ]

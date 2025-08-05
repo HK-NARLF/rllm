@@ -8,7 +8,6 @@ from rllm.environments.base.base_env import BaseEnv
 from rllm.rewards.reward_fn import RewardFunction, zero_reward
 from rllm.tools.multi_tool import MultiTool
 from rllm.tools.tool_base import Tool
-from rllm.tools.request_manager import ToolRequestManager
 
 
 class ToolEnvironment(BaseEnv):
@@ -115,17 +114,14 @@ class ToolEnvironment(BaseEnv):
         Submits tool calls to ToolRequestManager and waits for their results.
         This method is synchronous.
         """
-        manager = ToolRequestManager()
-        if not manager._is_running:
-            manager.start()
-            
         futures = {}
         for tool_call in tool_calls:
             tool_name = tool_call["function"]["name"]
             tool_args = json.loads(tool_call["function"]["arguments"])
             original_call_id = tool_call["id"]
 
-            future = manager.submit_request(
+            from rllm.tools.request_manager import submit_tool_request
+            future = submit_tool_request(
                 tool_name=tool_name,
                 tool_args=tool_args,
                 original_call_id=original_call_id,
