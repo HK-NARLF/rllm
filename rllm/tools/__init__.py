@@ -23,8 +23,8 @@ DEFAULT_TOOLS = {
     "python": PythonInterpreter,
     "google_search": GoogleSearchTool,
     "firecrawl": FirecrawlTool,
-    "tavily_extract": TavilyExtractTool,
-    "tavily_search": TavilySearchTool,
+    "tavily-extract": TavilyExtractTool,
+    "tavily-search": TavilySearchTool,
 }
 
 # Create the singleton registry instance and register all default tools

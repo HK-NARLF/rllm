@@ -139,11 +139,20 @@ class MCPConnectionManager:
             print(f"\nConnected to MCP server with tools: {[tool.name for tool in tools]}")
 
             self.tool_map = {}
+            # Create both original and mapped tool names
             for tool in tools:
                 mcp_tool = MCPTool(session=self.session, tool_name=tool.name, tool_description=tool.description, tool_schema=tool.inputSchema)  # type: ignore
+                
+                # Add original tool name (with hyphen)
                 self.tool_map[tool.name] = mcp_tool
+                
+                # Add mapped tool name (with underscore) for LLM compatibility
+                mapped_name = tool.name.replace('-', '_')
+                if mapped_name != tool.name:
+                    mapped_tool = MCPTool(session=self.session, tool_name=tool.name, tool_description=tool.description, tool_schema=tool.inputSchema)  # type: ignore
+                    self.tool_map[mapped_name] = mapped_tool
 
-            print(f"Initialized {len(self.tool_map)} MCP tools")
+            print(f"Initialized {len(self.tool_map)} MCP tools (including name mappings)")
 
     async def _execute_tools(self, tool_calls: list[dict[str, Any]]) -> dict[str, str]:
         """Execute tool calls."""
